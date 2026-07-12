@@ -16,6 +16,6 @@
     }
   ],
   "env": {
-    "VITE_API_BASE_URL": "https://tut-event-handler-api.onrender.com"
+    "VITE_API_BASE_URL": "https://event-handler-api.onrender.com"
   }
 }
