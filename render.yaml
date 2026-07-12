@@ -30,6 +30,7 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
-    databases:
-      - name: tut-event-db
-        plan: free
+
+databases:
+  - name: tut-event-db
+    plan: free
