@@ -1,9 +1,10 @@
 services:
   - type: web
     name: tut-event-handler-api
-    runtime: image
+    runtime: java
     plan: free
-    dockerfilePath: Dockerfile
+    buildCommand: cd backend && chmod +x mvnw && ./mvnw clean package -DskipTests
+    startCommand: java -jar backend/target/eventhandler-0.0.1-SNAPSHOT.jar
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
