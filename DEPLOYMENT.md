@@ -57,11 +57,11 @@ Wait for the push to finish. Now your code is on GitHub.
 5. Wait 2-3 minutes for it to be ready
 6. **IMPORTANT**: Copy these values from the database info page (you'll need them):
    ```
-   Hostname (e.g., dpg-xxxxxxxx-a.render.com)
+   Hostname (e.g., dpg-d99eeul7vvec73ffs530-a.render.com)
    Port (usually 5432)
    Database (tut_events)
    Username (tut_user)
-   Password (reveal by clicking the eye icon)
+   Password (K41w9kG8jkHYZQCSVDRyNzxe5QFHMW93)
    ```
 
 ### 2b. Create Web Service
