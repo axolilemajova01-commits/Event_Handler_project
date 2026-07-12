@@ -97,7 +97,19 @@ public class AiEventService {
         body.put("model", openAiModel);
         body.put("temperature", 0.4);
         body.put("messages", Arrays.asList(
-                message("system", "You generate structured university event drafts for TUT organizers. Return concise JSON only with keys: title, description, suggestedCategory, tags, targetAudience, shortSummary, objectives, attendeeRequirements, estimatedDuration, searchKeywords."),
+                message("system", "You are a TUT event planning assistant. Analyze the organizer's prompt and extract or infer all details intelligently.\n\n" +
+                        "RULES:\n" +
+                        "- Title: Create a catchy, specific title based on the prompt (NOT a generic template)\n" +
+                        "- Description: Write 2-3 detailed sentences summarizing the event purpose, activities, and value\n" +
+                        "- suggestedCategory: Choose the BEST fit from: CAREER_FAIR, SPORTS, CULTURAL, ACADEMIC, HACKATHON, WORKSHOP, SEMINAR, CONFERENCE, STUDENT_SOCIETY, COMMUNITY_OUTREACH, ENTERTAINMENT, ORIENTATION\n" +
+                        "- estimatedDuration: Calculate from start/end times if given (e.g., 6pm-6am = 12 hours, 9am-5pm = 8 hours). If no times, estimate based on event type.\n" +
+                        "- targetAudience: Who should attend (e.g., 'ICT students', 'All TUT students', 'Final year students')\n" +
+                        "- shortSummary: One sentence summary\n" +
+                        "- objectives: 3-4 bullet points of what attendees will gain\n" +
+                        "- attendeeRequirements: What to bring (laptop, calculator, ID, etc.) or 'None'\n" +
+                        "- tags: 3-5 searchable keywords\n" +
+                        "- searchKeywords: 5-8 keywords for search\n\n" +
+                        "Return ONLY valid JSON with these exact keys. No markdown, no commentary."),
                 message("user", request.prompt)
         ));
 
@@ -143,11 +155,20 @@ public class AiEventService {
 
         Map<String, Object> content = new LinkedHashMap<>();
         content.put("parts", List.of(Map.of("text",
-                "You generate structured university event drafts for TUT organizers. "
-                + "Return ONLY valid JSON. Do not use markdown. Do not add commentary. "
-                + "Use exactly these keys: title, description, suggestedCategory, tags, targetAudience, shortSummary, objectives, attendeeRequirements, estimatedDuration, searchKeywords. "
-                + "Use one of these suggestedCategory values: CAREER_FAIR, SPORTS, CULTURAL, ACADEMIC, HACKATHON, WORKSHOP, SEMINAR, CONFERENCE, STUDENT_SOCIETY, COMMUNITY_OUTREACH, ENTERTAINMENT, ORIENTATION.\n\n"
-                + "Organizer prompt: " + request.prompt)));
+                "You are a TUT event planning assistant. Analyze the organizer's prompt and extract or infer all details intelligently.\n\n" +
+                        "RULES:\n" +
+                        "- Title: Create a catchy, specific title based on the prompt (NOT a generic template)\n" +
+                        "- Description: Write 2-3 detailed sentences summarizing the event purpose, activities, and value\n" +
+                        "- suggestedCategory: Choose the BEST fit from: CAREER_FAIR, SPORTS, CULTURAL, ACADEMIC, HACKATHON, WORKSHOP, SEMINAR, CONFERENCE, STUDENT_SOCIETY, COMMUNITY_OUTREACH, ENTERTAINMENT, ORIENTATION\n" +
+                        "- estimatedDuration: Calculate from start/end times if given (e.g., 6pm-6am = 12 hours, 9am-5pm = 8 hours). If no times, estimate based on event type.\n" +
+                        "- targetAudience: Who should attend (e.g., 'ICT students', 'All TUT students', 'Final year students')\n" +
+                        "- shortSummary: One sentence summary\n" +
+                        "- objectives: 3-4 bullet points of what attendees will gain\n" +
+                        "- attendeeRequirements: What to bring (laptop, calculator, ID, etc.) or 'None'\n" +
+                        "- tags: 3-5 searchable keywords\n" +
+                        "- searchKeywords: 5-8 keywords for search\n\n" +
+                        "Organizer prompt: " + request.prompt + "\n\n" +
+                        "Return ONLY valid JSON with these exact keys. No markdown, no commentary.")));
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("contents", List.of(Map.of("role", "user", "parts", content.get("parts"))));
