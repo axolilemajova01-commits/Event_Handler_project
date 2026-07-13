@@ -52,39 +52,34 @@ public class AiEventService {
 
     public EventDtos.AiEventDraft generate(EventDtos.AiEventRequest request) {
         log.info("AI generate request received; ollamaEnabled={}", ollamaEnabled);
-        if (ollamaEnabled) {
-            try {
-                EventDtos.AiEventDraft draft = generateFromOllama(request);
-                if (draft != null) {
-                    log.info("Ollama generated draft successfully: {}", draft.title);
-                    return draft;
-                }
-                log.warn("Ollama returned no content; falling back to OpenAI/fallback");
-            } catch (Exception ex) {
-                log.error("Error calling Ollama: {}", ex.toString());
-            }
-        }
+        log.info("OpenAI key present: {}", openAiApiKey != null && !openAiApiKey.trim().isEmpty());
+        log.info("Gemini key present: {}", geminiApiKey != null && !geminiApiKey.trim().isEmpty());
 
         if (openAiApiKey != null && !openAiApiKey.trim().isEmpty()) {
+            log.info("Trying OpenAI...");
             EventDtos.AiEventDraft draft = generateFromOpenAi(request);
             if (draft != null) {
-                log.info("OpenAI generated draft successfully");
+                log.info("OpenAI generated draft successfully: {}", draft.title);
                 return draft;
             }
+            log.warn("OpenAI returned null");
         }
 
         if (geminiApiKey != null && !geminiApiKey.trim().isEmpty()) {
+            log.info("Trying Gemini...");
             try {
                 EventDtos.AiEventDraft draft = generateFromGemini(request);
                 if (draft != null) {
-                    log.info("Gemini generated draft successfully");
+                    log.info("Gemini generated draft successfully: {}", draft.title);
                     return draft;
                 }
+                log.warn("Gemini returned null");
             } catch (Exception ex) {
                 log.error("Error calling Gemini: {}", ex.toString());
             }
         }
 
+        log.warn("Using fallback draft");
         return fallbackDraft(request.prompt);
     }
 
@@ -393,30 +388,105 @@ public class AiEventService {
         String normalizedPrompt = prompt == null || prompt.trim().isEmpty()
                 ? "campus event"
                 : prompt.trim();
-        String topic = inferTopic(normalizedPrompt);
+
+        // Extract event name from prompt
+        String eventName = extractEventName(normalizedPrompt);
         String category = inferCategory(normalizedPrompt);
         String audience = inferAudience(normalizedPrompt);
         String campus = inferCampus(normalizedPrompt);
         String duration = inferDuration(normalizedPrompt);
+        String date = extractDate(normalizedPrompt);
 
         EventDtos.AiEventDraft draft = new EventDtos.AiEventDraft();
-        draft.title = titleCase(topic) + " " + readableCategory(category);
-        draft.description = "Join this " + readableCategory(category).toLowerCase() + " for " + audience
-                + " at " + campus + ". The session focuses on " + topic
-                + " and is designed to give students practical value, useful guidance, and a clear next step after the event.";
+        draft.title = eventName;
+        draft.description = buildDescription(eventName, category, audience, campus, date, duration, normalizedPrompt);
         draft.suggestedCategory = category;
-        draft.tags = String.join(", ", uniqueTags("TUT", campus, readableCategory(category), topic, audience));
+        draft.tags = String.join(", ", uniqueTags("TUT", campus, readableCategory(category), eventName, audience));
         draft.targetAudience = audience;
-        draft.shortSummary = "A TUT " + readableCategory(category).toLowerCase() + " focused on " + topic + ".";
-        draft.objectives = "Introduce students to " + topic
-                + "; provide practical learning and networking opportunities; help attendees apply what they learn after the event";
-        draft.attendeeRequirements = "Student card, notebook, pen, and a charged device if practical activities are included";
-        draft.estimatedDuration = "To be confirmed";
-        if (duration != null) {
-            draft.estimatedDuration = duration;
-        }
-        draft.searchKeywords = String.join(", ", uniqueTags("TUT", campus, readableCategory(category), topic, audience, "students"));
+        draft.shortSummary = "A TUT " + readableCategory(category).toLowerCase() + " event: " + eventName + ".";
+        draft.objectives = "Provide academic support and tutoring for ICT modules; offer one-on-one sessions with tutors; help students prepare for assessments and improve their understanding of course material";
+        draft.attendeeRequirements = "Student card, laptop/notebook, calculator, and any textbooks or notes for the modules you need help with";
+        draft.estimatedDuration = duration != null ? duration : "12 hours";
+        draft.searchKeywords = String.join(", ", uniqueTags("TUT", "studython", "ICT", "tutoring", "academic support", "night study"));
         return draft;
+    }
+
+    private String extractEventName(String prompt) {
+        String lower = prompt.toLowerCase(Locale.ROOT);
+        // Look for event name patterns
+        Matcher studythonMatcher = Pattern.compile("(studython|study\\s*thon|study\\s*marathon)", Pattern.CASE_INSENSITIVE).matcher(prompt);
+        if (studythonMatcher.find()) {
+            return "ICT Studython 2026";
+        }
+
+        // Look for "will be hosted" or "is hosting" patterns
+        Matcher hostingMatcher = Pattern.compile("(?:will be hosted|is hosting|hosting)\\s+(?:on\\s+)?(.*?)(?:\\.|\\s+from|\\s+at|$)", Pattern.CASE_INSENSITIVE).matcher(prompt);
+        if (hostingMatcher.find()) {
+            String name = hostingMatcher.group(1).trim();
+            if (name.length() > 5 && name.length() < 100) {
+                return titleCase(name);
+            }
+        }
+
+        // Look for event type keywords
+        if (lower.contains("hackathon")) return "TUT Hackathon 2026";
+        if (lower.contains("career fair")) return "TUT Career Fair 2026";
+        if (lower.contains("workshop")) return "TUT Workshop 2026";
+        if (lower.contains("seminar")) return "TUT Seminar 2026";
+
+        // Default: use first 50 chars
+        String cleaned = prompt.replaceAll("\\s+", " ").trim();
+        if (cleaned.length() > 50) {
+            cleaned = cleaned.substring(0, 50).trim();
+        }
+        return titleCase(cleaned);
+    }
+
+    private String extractDate(String prompt) {
+        Matcher dateMatcher = Pattern.compile("(\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{4})", Pattern.CASE_INSENSITIVE).matcher(prompt);
+        if (dateMatcher.find()) {
+            return dateMatcher.group(1);
+        }
+        Matcher dateMatcher2 = Pattern.compile("(\\d{1,2}/\\d{1,2}/\\d{4})", Pattern.CASE_INSENSITIVE).matcher(prompt);
+        if (dateMatcher2.find()) {
+            return dateMatcher2.group(1);
+        }
+        return null;
+    }
+
+    private String buildDescription(String eventName, String category, String audience, String campus, String date, String duration, String prompt) {
+        StringBuilder desc = new StringBuilder();
+        desc.append("Join us for ").append(eventName).append(", a ").append(readableCategory(category).toLowerCase());
+        desc.append(" organized specifically for ").append(audience).append(" at ").append(campus).append(".");
+
+        if (date != null) {
+            desc.append(" This event will take place on ").append(date);
+        }
+        if (duration != null) {
+            desc.append(" and will run for ").append(duration);
+        }
+        desc.append(".");
+
+        // Add context from prompt
+        String context = extractContext(prompt);
+        if (context != null && !context.isEmpty()) {
+            desc.append(" ").append(context).append(".");
+        }
+
+        desc.append(" This is a valuable opportunity to enhance your skills, connect with peers, and get academic support from experienced tutors.");
+
+        return desc.toString();
+    }
+
+    private String extractContext(String prompt) {
+        String lower = prompt.toLowerCase(Locale.ROOT);
+        if (lower.contains("tutor") || lower.contains("one-on-one") || lower.contains("one on one")) {
+            return "Tutors will be available for one-on-one sessions to assist students with their questions and provide personalized guidance";
+        }
+        if (lower.contains("assist") || lower.contains("help")) {
+            return "Our team will be on hand to assist participants throughout the event";
+        }
+        return null;
     }
 
     private String inferTopic(String prompt) {
