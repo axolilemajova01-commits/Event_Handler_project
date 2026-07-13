@@ -40,6 +40,12 @@ public class RegistrationController {
         return ResponseEntity.ok(registrationService.attendees(eventId));
     }
 
+    @GetMapping("/students/{studentId}/event-ids")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    public ResponseEntity<List<Long>> registeredEventIds(@PathVariable Long studentId) {
+        return ResponseEntity.ok(registrationService.getRegisteredEventIds(studentId));
+    }
+
     @GetMapping(value = "/qr/{qrCodeToken}", produces = MediaType.IMAGE_PNG_VALUE)
     @PreAuthorize("hasAnyRole('STUDENT','ORGANIZER','ADMIN')")
     public byte[] qrCode(@PathVariable String qrCodeToken) {

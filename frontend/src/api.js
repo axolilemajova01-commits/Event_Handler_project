@@ -160,6 +160,14 @@ export async function registerForEvent(eventId, studentId, token) {
   return response.json();
 }
 
+export async function fetchRegisteredEventIds(studentId, token) {
+  const response = await fetch(`${API_BASE_URL}/api/registrations/students/${studentId}/event-ids`, {
+    headers: authHeaders(token)
+  });
+  if (!response.ok) throw new Error('Could not load registrations');
+  return response.json();
+}
+
 export async function uploadPoster(file, token) {
   const formData = new FormData();
   formData.append('file', file);

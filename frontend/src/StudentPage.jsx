@@ -1,7 +1,7 @@
 import React from 'react';
 import { Users, Bookmark, Search } from 'lucide-react';
 import { events as fallbackEvents } from './data/events';
-import { fetchPublicEvents, fetchCampuses, fetchFaculties, saveEvent, registerForEvent, fetchSavedEvents } from './api';
+import { fetchPublicEvents, fetchCampuses, fetchFaculties, saveEvent, registerForEvent, fetchSavedEvents, fetchRegisteredEventIds } from './api';
 
 const CATEGORIES = ['All', 'Workshop', 'Seminar', 'Career Fair', 'Sports', 'Academic', 'Cultural'];
 const SORT_OPTIONS = [
@@ -40,11 +40,19 @@ export default function StudentPage({ currentUser, token, onSignOut }) {
   const facultyOptions = availableFaculties.map((f) => f.name);
   const hasActiveFilters = query || campusFilter !== campusOptions[0] || facultyFilter !== facultyOptions[0] || showOnlySaved || showOnlyRegistered || categoryFilter !== 'All';
 
-  // Load user's saved & registered events from server on mount
+  // Load user's saved events from server on mount
   React.useEffect(() => {
     if (!currentUser?.id || !token) return;
     fetchSavedEvents(currentUser.id, token)
       .then((saved) => setSavedEventIds(new Set(saved.map((s) => s.eventId || s.event?.id))))
+      .catch(() => {});
+  }, [currentUser?.id, token]);
+
+  // Load user's registered event IDs from server on mount (persists across logins)
+  React.useEffect(() => {
+    if (!currentUser?.id || !token) return;
+    fetchRegisteredEventIds(currentUser.id, token)
+      .then((ids) => setRegisteredEventIds(new Set(ids)))
       .catch(() => {});
   }, [currentUser?.id, token]);
 

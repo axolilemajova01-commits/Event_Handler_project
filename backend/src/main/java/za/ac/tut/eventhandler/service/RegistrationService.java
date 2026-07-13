@@ -53,6 +53,13 @@ public class RegistrationService {
         return registrationRepository.findByEventId(eventId).stream().map(this::toAttendeeResponse).toList();
     }
 
+    public List<Long> getRegisteredEventIds(Long studentId) {
+        return registrationRepository.findByStudentId(studentId)
+                .stream()
+                .map(r -> r.getEvent().getId())
+                .toList();
+    }
+
     private RegistrationDtos.AttendeeResponse toAttendeeResponse(Registration registration) {
         RegistrationDtos.AttendeeResponse response = new RegistrationDtos.AttendeeResponse();
         response.id = registration.getId();
