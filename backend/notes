@@ -1,0 +1,32 @@
+**6.59GB used means the database is working!** Data is being stored. You just need to connect pgAdmin to see it.
+
+**Connect pgAdmin to Render's PostgreSQL:**
+
+1. Open **pgAdmin** → right-click **"Servers"** → **"Register"** → **"Server..."**
+
+2. **Name tab:** Enter `TUT Render DB`
+
+3. **Connection tab:** Fill in:
+
+| Field | Value |
+|-------|-------|
+| **Host** | `dpg-d99fv8po3t8c73fat7kg-a.frankfurt-postgres.render.com` |
+| **Port** | `5432` |
+| **Database** | `tut_events_87yz` |
+| **Username** | `tut_user` |
+| **Password** | `JQtlkOr9cSQRVCcevGItgmTVvsMhV2ii` |
+| **SSL Mode** | `Require` (or check the box for SSL) |
+
+4. Click **Save**
+
+You'll see the tables under `Schemas → public → Tables`:
+- `users` (has organizer@tut.ac.za, student@tut.ac.za, admin@tut.ac.za — password: "password")
+- `events`
+- `registration`
+- `saved_event`
+- `campus`
+- `faculty`
+
+**If you can't see tables right away**, you may need to deploy the latest code first. Go to Render → web service → **Manual Deploy** → **"Deploy latest commit"**. The latest code has Hibernate's `ddl-auto: update` which creates all tables automatically on startup.
+
+After deploy, refresh pgAdmin and you'll see the tables populated with data.
