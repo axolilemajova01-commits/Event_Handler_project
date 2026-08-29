@@ -1,275 +1,246 @@
-# TUT Event Handler - Deployment Guide
+# TUT Event Handler — Deployment Guide
 
-## What You Need Before Starting
+Deployment instructions for the TUT Event Handler platform: a React + Vite frontend
+hosted on Vercel, a Spring Boot API hosted on Render, and a managed PostgreSQL
+database on Render.
 
-- ✅ GitHub account (already set up)
-- ✅ Render account (already set up - https://render.com)
-- ✅ Vercel account (already set up - https://vercel.com)
-- ✅ Your Gemini API key: `AQ.Ab8RN6K7Y8EJ-Q0Y1SoTRFzTR4ZdMPmkxfaU1DcYlDLfoXwLBw`
-- ✅ Your OpenAI API key: `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`
+| Component | Stack | Host |
+|-----------|-------|------|
+| Frontend | Vite + React + Tailwind | Vercel |
+| Backend | Spring Boot 3.5 / Java 21 | Render (Web Service) |
+| Database | PostgreSQL | Render (expires — see below) |
 
-## AI & Email Questions Answered
+## Prerequisites
 
-### Does Ollama work on Render?
-**No.** Ollama runs on your local machine only. On Render's server:
-- If you provide a **Gemini API key** → AI draft generation uses Google Gemini
-- If you provide an **OpenAI API key** → AI draft generation uses OpenAI
-- If you **don't** provide any key → AI draft uses a built-in template (still works!)
+- GitHub repository containing this code
+- [Render](https://render.com) account
+- [Vercel](https://vercel.com) account
+- Gemini and/or OpenAI API key (optional — see service behaviour below)
+- Gmail app password (optional — only needed for outbound email)
 
-### Does email work on Render?
-**Not by default.** Email sending needs Gmail credentials configured. 
-- If you don't set MAIL_USERNAME/MAIL_PASSWORD → forgot password works in the UI anyway
-- The app returns a clickable reset link directly on screen
+## Service Behaviour Notes
+
+### AI event drafting
+
+Ollama does not run on Render's servers. The backend picks its AI provider from
+the environment:
+
+- `GEMINI_API_KEY` set → drafts are generated with Google Gemini
+- `OPENAI_API_KEY` set → drafts are generated with OpenAI
+- neither set → a deterministic built-in template is used, so the feature
+  degrades in quality but never fails
+
+### Email / forgot password
+
+Outbound email requires `MAIL_USERNAME` and `MAIL_PASSWORD` (Gmail app password).
+Without them the forgot-password flow still works: the API returns the reset
+link directly in the response, and the UI renders it as a clickable link.
 
 ---
 
-## STEP 1: Push Your Code to GitHub
-
-Open a terminal in the project folder and run these commands one by one:
+## Step 1 — Push the Code to GitHub
 
 ```bash
-# 1. Add all files
 git add .
-
-# 2. Commit with a message
-git commit -m "Ready for deployment with Render + Vercel"
-
-# 3. Push to GitHub
+git commit -m "Prepare for deployment"
 git push origin main
 ```
 
-Wait for the push to finish. Now your code is on GitHub.
-
 ---
 
-## STEP 2: Deploy Backend to Render
+## Step 2 — Deploy the Backend to Render
 
-### 2a. Create PostgreSQL Database
+### 2a. Create the PostgreSQL Database
 
-1. Go to **https://dashboard.render.com**
-2. Click **"New +"** → **"PostgreSQL"**
-3. Fill in:
-   - **Name**: `tut-event-db`
+1. Render dashboard → **New +** → **PostgreSQL**
+2. Configure:
+   - **Name**: `event-handler-db` (any name)
    - **Database**: `tut_events`
    - **User**: `tut_user`
-   - **Plan**: **Free** (scroll down - "Free" is $0/month)
-4. Click **"Create Database"**
-5. Wait 2-3 minutes for it to be ready
-6. **IMPORTANT**: Copy these values from the database info page (you'll need them):
+   - **Plan**: Free
+   - **Region**: same as the API service (Frankfurt EU is closest to South Africa)
+3. **Create Database** — ready in 2–3 minutes
+4. From the **Info** page, record the **External** connection values:
+
    ```
-   Hostname (e.g., dpg-d99eeul7vvec73ffs530-a.render.com)
-   Port (usually 5432)
-   Database (tut_events)
-   Username (tut_user)
-   Password (K41w9kG8jkHYZQCSVDRyNzxe5QFHMW93)
+   Hostname   dpg-xxxxxxxxxxxx-a.render.com
+   Port       5432
+   Database   tut_events
+   Username   tut_user
+   Password   (shown on the same page)
    ```
 
-### 2b. Create Web Service
+### 2b. Create the Web Service
 
-1. Still on Render dashboard, click **"New +"** → **"Web Service"**
-2. Under "Connect a repository", click **"Connect"** next to your GitHub repo
-3. If it asks for permissions, grant access
-4. Fill in the details:
-   - **Name**: `tut-event-handler-api`
-   - **Runtime**: **Java** (select from dropdown)
+1. Render dashboard → **New +** → **Web Service** → connect the GitHub repo
+2. Settings:
+   - **Name**: `event-handler-api` (any name)
+   - **Runtime**: Java
    - **Branch**: `main`
-   - **Region**: Choose **Frankfurt (EU)** (closest to South Africa)
-   - **Plan**: **Free**
-5. Click **"Advanced"** (the button, not Create Web Service)
+   - **Region**: Frankfurt (EU)
+   - **Plan**: Free
+3. **Build Command**: `cd backend && mvn clean package -DskipTests`
+4. **Start Command**: `java -jar backend/target/eventhandler-0.0.1-SNAPSHOT.jar`
+5. Open **Advanced** → add the environment variables from 2c
+6. **Create Web Service** — the first build takes 5–10 minutes
 
-### 2c. Add Environment Variables
+### 2c. Environment Variables
 
-In the "Environment Variables" section, add these **one by one**:
+Required:
 
 | Variable | Value |
 |----------|-------|
 | `SPRING_PROFILES_ACTIVE` | `prod` |
 | `PORT` | `8081` |
-| `DB_HOST` | (Hostname from step 2a) |
+| `DB_HOST` | hostname from step 2a |
 | `DB_PORT` | `5432` |
 | `DB_NAME` | `tut_events` |
-| `DB_USERNAME` | (Username from step 2a) |
-| `DB_PASSWORD` | (Password from step 2a) |
-| `JWT_SECRET` | Click **"Generate Value"** |
-| `GEMINI_API_KEY` | `AQ.Ab8RN6K7Y8EJ-Q0Y1SoTRFzTR4ZdMPmkxfaU1DcYlDLfoXwLBw` |
-| `OPENAI_API_KEY` | `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` |
-| `VERCEL_DOMAIN` | `tut-event-handler.vercel.app` (add this after Vercel) |
+| `DB_USERNAME` | username from step 2a |
+| `DB_PASSWORD` | password from step 2a |
+| `JWT_SECRET` | use Render's **Generate Value** button |
+| `VERCEL_DOMAIN` | `<app-name>.vercel.app` (add after Step 3) |
 
-**Optional** (skip these if you don't have them):
-| `MAIL_USERNAME` | your-email@gmail.com |
+AI providers (at least one recommended):
+
+| Variable | Value |
+|----------|-------|
+| `GEMINI_API_KEY` | key from Google AI Studio |
+| `OPENAI_API_KEY` | key from the OpenAI dashboard |
+
+Optional:
+
+| Variable | Value |
+|----------|-------|
+| `MAIL_USERNAME` | Gmail address |
 | `MAIL_PASSWORD` | Gmail app password |
-| `CLOUDINARY_CLOUD_NAME` | (for poster uploads) |
-| `CLOUDINARY_API_KEY` | |
-| `CLOUDINARY_API_SECRET` | |
+| `CLOUDINARY_CLOUD_NAME` | for poster uploads |
+| `CLOUDINARY_API_KEY` | for poster uploads |
+| `CLOUDINARY_API_SECRET` | for poster uploads |
 
-### 2d. Create the Service
+> **Never commit real values of these variables to the repository.** They belong
+> only in the Render Environment tab (and Vercel's equivalent for the frontend).
 
-1. Under Build and Deploy, make sure:
-   - **Build Command**: `cd backend && mvn clean package -DskipTests`
-   - **Start Command**: `java -jar backend/target/eventhandler-0.0.1-SNAPSHOT.jar`
-2. Click **"Create Web Service"**
-3. **Wait 5-10 minutes** for the build. You'll see a live log of:
-   - Maven downloading dependencies
-   - Java compiling
-   - Spring Boot starting up
-4. When done, you'll see: **"Your service is live 🎉"**
-5. Copy your backend URL. It looks like:
-   ```
-   https://tut-event-handler-api.onrender.com
-   ```
+### 2d. Verify the Backend
 
-### 2e. Test the Backend
-
-Open a new browser tab and paste `https://tut-event-handler-api.onrender.com` - you should see a response.
+Open `https://<service-name>.onrender.com` in a browser — the API root should
+respond with JSON.
 
 ---
 
-## STEP 3: Deploy Frontend to Vercel
+## Step 3 — Deploy the Frontend to Vercel
 
-### 3a. Start Deployment
-
-1. Go to **https://vercel.com**
-2. Click **"Add New…"** → **"Project"**
-3. Click **"Import Git Repository"** and find your GitHub repo
-4. If it asks, grant Vercel access to your GitHub
-
-### 3b. Configure Project
-
-1. **Root Directory**: Click "Edit" → Select **`frontend`** from the dropdown
-2. **Framework Preset**: Should auto-detect "Vite"
-3. **Build Command**: `npm run build` (should be auto-filled)
-4. **Output Directory**: `dist` (should be auto-filled)
-
-### 3c. Add Environment Variable
-
-Click **"Environment Variables"** → Add:
-```
-VITE_API_BASE_URL=https://tut-event-handler-api.onrender.com
-```
-(Use your actual backend URL from Step 2d)
-
-### 3d. Deploy
-
-1. Click **"Deploy"**
-2. Wait 1-2 minutes
-3. When done, you'll see: **"Congratulations, your project is deployed! 🎉"**
-4. Your frontend URL:
+1. Vercel → **Add New…** → **Project** → import the GitHub repo
+2. **Root Directory**: `frontend`
+3. **Framework Preset**: Vite (auto-detected)
+4. **Build Command**: `npm run build` · **Output Directory**: `dist`
+5. Environment variable → **Add**:
    ```
-   https://tut-event-handler.vercel.app
+   VITE_API_BASE_URL=https://<service-name>.onrender.com
    ```
+   (the backend URL from Step 2d)
+6. **Deploy** — ready in 1–2 minutes; note the resulting `<app-name>.vercel.app` URL
 
-### 3e. Update CORS on Backend
+### Update CORS on the Backend
 
-Now that Vercel gave you a URL:
-
-1. Go back to **Render dashboard** → your web service
-2. Click **"Environment"** tab
-3. Click **"Add Environment Variable"**
-4. Add: `VERCEL_DOMAIN` = `tut-event-handler.vercel.app`
-5. Click **"Save Changes"**
-6. The service will automatically redeploy (wait 2-3 minutes)
+1. Render dashboard → the API service → **Environment** tab
+2. Add `VERCEL_DOMAIN` = `<app-name>.vercel.app`
+3. **Save Changes** — the service redeploys automatically (2–3 minutes)
 
 ---
 
-## STEP 4: Test Everything
+## Step 4 — Verify the Deployment
 
-### Open Your Live Site
-
-1. Go to **https://tut-event-handler.vercel.app** (or whatever Vercel gave you)
-2. The login page should load
-
-### Test Registration
-
-1. Click "Register"
-2. Enter:
-   - Full name: `Admin User`
-   - Student number: `000000000`
-   - Role: select **Event Organizer**
-   - Email: `admin@tut.ac.za`
-   - Password: `admin123`
-3. Click "Create account"
-4. ✅ You should be logged in
-
-### Test Forgot Password
-
-1. Sign out
-2. Click "Forgot password?"
-3. Enter: `admin@tut.ac.za`
-4. ✅ You should see the screen to enter a new password
-5. Enter a new password and reset it
-6. Log in with the new password
-
-### Test AI Event Draft
-
-1. Log in as an organizer
-2. Click "Generate draft"
-3. ✅ Should generate an event using Google Gemini or OpenAI
+1. Open the Vercel URL — the login page should load
+2. Register a user with role **Event Organizer** → auto-login works
+3. Sign out → **Forgot password?** → submit the email → a reset link is shown
+   on screen (or emailed, if mail credentials are configured)
+4. Log in as the organizer → **Generate draft** → an event draft is produced
+   (Gemini, OpenAI, or the built-in template depending on configuration)
 
 ---
 
-## STEP 5: Create the First Admin User
+## Step 5 — Create the First Admin Account
 
-To access the admin dashboard:
+`/register` only creates students/organizers, and creating staff accounts
+requires an existing admin — so promote one manually:
 
-1. Register a new user with email `admin@tut.ac.za` and role **Event Organizer**
-2. Go to **Render dashboard** → your database
-3. Click **"Connect"** → copy the PSQL command
-4. Paste it in your terminal and run:
+1. Register a normal account (e.g. `admin@tut.ac.za`)
+2. Render dashboard → the database → **Connect** → copy the external PSQL
+   command and run it in a terminal
+3. Promote the account:
    ```sql
    UPDATE users SET role = 'ADMIN', approved = true WHERE email = 'admin@tut.ac.za';
    ```
-5. Log out and log back in → you'll see the Admin dashboard
+4. Log out and back in → the Admin dashboard is available
+
+`role` is stored as a string — `'ADMIN'` must match the `UserRole` enum
+constant exactly (case-sensitive).
 
 ---
 
-## Quick Reference: Environment Variables
+## Environment Variable Reference
 
-### Backend (Render)
+Backend (Render):
+
 ```
-SPRING_PROFILES_ACTIVE=prod          # Required
-PORT=8081                            # Required
-DB_HOST=xxx                          # From Render PostgreSQL
-DB_PORT=5432                         # From Render PostgreSQL
-DB_NAME=tut_events                   # From Render PostgreSQL
-DB_USERNAME=xxx                      # From Render PostgreSQL
-DB_PASSWORD=xxx                      # From Render PostgreSQL
-JWT_SECRET=xxx                       # Click "Generate Value"
-GEMINI_API_KEY=xxx                   # Your Gemini API key
-OPENAI_API_KEY=xxx                   # Your OpenAI API key
-VERCEL_DOMAIN=xxx.vercel.app         # Your Vercel URL
+SPRING_PROFILES_ACTIVE=prod
+PORT=8081
+DB_HOST=xxx                          # from Render PostgreSQL
+DB_PORT=5432
+DB_NAME=tut_events
+DB_USERNAME=xxx                      # from Render PostgreSQL
+DB_PASSWORD=xxx                      # from Render PostgreSQL
+JWT_SECRET=xxx                       # "Generate Value"
+GEMINI_API_KEY=xxx                   # optional
+OPENAI_API_KEY=xxx                   # optional
+VERCEL_DOMAIN=xxx.vercel.app
+MAIL_USERNAME=xxx                    # optional
+MAIL_PASSWORD=xxx                    # optional
+CLOUDINARY_CLOUD_NAME=xxx            # optional
+CLOUDINARY_API_KEY=xxx               # optional
+CLOUDINARY_API_SECRET=xxx            # optional
 ```
 
-### Frontend (Vercel)
+Frontend (Vercel):
+
 ```
-VITE_API_BASE_URL=https://tut-event-handler-api.onrender.com
+VITE_API_BASE_URL=https://<backend-service>.onrender.com
+```
+
+---
+
+## Database Expiry (Render Free Tier)
+
+Render's free PostgreSQL is **deleted 90 days after creation** — the API then
+cannot open a connection, fails to boot, and every request fails. The revival
+procedure (fresh database + re-pointing the five `DB_*` variables) is in
+**[RENDER_DB_REVIVAL.md](./RENDER_DB_REVIVAL.md)**.
+
+Before expiry, capture a portable backup:
+
+```bash
+pg_dump "postgresql://<user>:<password>@<hostname>/tut_events?sslmode=require" -Fc -f backup.dump
 ```
 
 ---
 
 ## Troubleshooting
 
-### "Application Error" on Render
-- Wait 2 minutes after build finishes
-- Check "Logs" tab for error details
-- Make sure all DB environment variables are set correctly
+**"Application Error" on Render** — wait 2 minutes after the build finishes,
+then check the **Logs** tab; usually a mistyped `DB_*` variable.
 
-### Frontend shows blank page
-- Open browser DevTools (F12) → Console tab
-- Look for errors
-- Most common: `VITE_API_BASE_URL` is wrong
+**Frontend shows a blank page** — open DevTools (F12) → Console; the most
+common cause is a wrong `VITE_API_BASE_URL`.
 
-### CORS errors in browser
-- Make sure `VERCEL_DOMAIN` env variable is set correctly on Render
-- Redeploy the backend after adding it
+**CORS errors in the browser** — ensure `VERCEL_DOMAIN` is set on the Render
+service, then redeploy.
 
-### AI draft not working
-- Check that `GEMINI_API_KEY` or `OPENAI_API_KEY` is set correctly on Render
-- Check Render logs for error messages
+**AI drafts not generated** — check that `GEMINI_API_KEY` / `OPENAI_API_KEY`
+are set and check the Render logs; without any key the built-in template is
+used by design.
 
-### Slow first load (free plan)
-- Render Free plan sleeps after 15 minutes of no use
-- The first request takes ~30 seconds to wake up
-- After that it's fast
+**Slow first request** — Render's free plan sleeps after 15 minutes idle; the
+first request takes ~30 seconds to wake the service.
 
 ---
 
@@ -284,10 +255,7 @@ VITE_API_BASE_URL=https://tut-event-handler-api.onrender.com
 
 ---
 
-## Done! 🎉
+## Redeploying
 
-Your TUT Event Handler is now live on the internet. To make changes:
-
-1. Edit code in Visual Studio Code
-2. `git add . && git commit -m "description" && git push`
-3. Both Render and Vercel automatically redeploy
+Pushes to `main` trigger automatic redeploys on both Render and Vercel — no
+manual steps required.
