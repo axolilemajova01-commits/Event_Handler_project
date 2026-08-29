@@ -26,3 +26,5 @@ Thumbs.db
 # Environment files
 .env
 .env.local
+# local scratch notes (contained DB credentials at one point)
+backend/notes
